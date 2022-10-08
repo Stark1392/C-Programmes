@@ -1,12 +1,16 @@
-#include<stdio.h>
+#include <stdio.h>
 
-int main(){
-printf("The table of 8 is \n");
-for(int i=1;i<=10;i++)
+int main()
 {
-printf(" 8 X %d = %d\n", i, 8*i);
-}
+    for(int i = 1; i <= 10; i++)
+    {
+        printf("The table of %d is: \n", i);
+        int j;
+        for(j = 1; j <= 10; j++)
+        {
+            printf("%d x %d = %d\n", i, j, i*j);
+        }
+    }
 
-return 0;
-	}
-	
+    return 0;
+}
