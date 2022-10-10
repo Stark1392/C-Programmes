@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <pthread.h>
+
 #define MAX 80
 #define PORT 8080
 #define SA struct sockaddr
@@ -20,34 +22,34 @@ int factorial(int n)
   	else  
     	return(n * factorial(n-1)); 
 }
-// Function designed for chat between client and server.
-void func(int connfd)
+
+void * func(void* p_connfd)
 {
-	char buff[MAX];
-	int n;
-	// infinite loop for chat
-	for (;;) {
-		bzero(buff, MAX);
-
-		// read the message from client and copy it in buffer
-		read(connfd, buff, sizeof(buff));
-		// print buffer which contains the client contents
-		printf("From client: %s\t To client : ", buff);
-		bzero(buff, MAX);
-		n = 0;
-		// copy server message in the buffer
-		while ((buff[n++] = getchar()) != '\n')
-			;
-
-		// and send that buffer to client
-		write(connfd, buff, sizeof(buff));
-
-		// if msg contains "Exit" then server exit and chat ended.
-		if (strncmp("exit", buff, 4) == 0) {
-			printf("Server Exit...\n");
-			break;
-		}
+	int connfd = *((int*)p_connfd);
+	free(p_connfd);
+	char buffer[50];
+	FILE *fpp;
+	fpp = fopen("toclient.txt","w") ; 
+	for(int i = 0; i < 5; i++)
+	{
+		bzero(buffer, 50);
+		printf("Receiving data from client:\n");
+		sleep(1);
+		recv(connfd, &buffer, 50, 0);
+		printf("from client: %s\n", buffer);
+		int num = atoi(buffer);
+		num = factorial(num);
+		printf("Calculating factorial now....\n");
+		bzero(buffer, 50);
+		char string[20];
+		sprintf(string, "%d", num);
+		strcpy(buffer, string);
+		printf("Sending data to client\n");
+		send(connfd, &buffer, 50, 0);
+		fprintf(fpp, "The factorial is: %d.\n", num);
 	}
+	fclose(fpp);
+	return NULL;
 }
 
 // Driver function
@@ -82,19 +84,18 @@ int main()
 	else
 		printf("Socket successfully binded..\n");
 
+	fp = fopen("data.txt","w"); 
+	if ((listen(sockfd, 5)) != 0) {
+		printf("Listen failed...\n");
+		exit(0);
+	}
+	else
+		printf("Server listening..\n");
+	len = sizeof(struct sockaddr_in);
 	while(1)
 	{
-		// Now server is ready to listen and verification
-		if ((listen(sockfd, 5)) != 0) {
-			printf("Listen failed...\n");
-			exit(0);
-		}
-		else
-			printf("Server listening..\n");
-		len = sizeof(cli);
-
 		// Accept the data packet from client and verification
-		connfd = accept(sockfd, (SA*)&cli, &len);
+		connfd = accept(sockfd, (SA*)&cli, (socklen_t*)&len);
 		if (connfd < 0) {
 			printf("server accept failed...\n");
 			exit(0);
@@ -103,39 +104,22 @@ int main()
 			printf("server accept the client...\n");
 
 		// Function for chatting between client and server
-		// func(connfd);
-
-		printf("Opening the data.txt\n");
-		sleep(1);
-		fp = fopen("data.txt","w") ; 
-
-		for(int i = 0; i < 5; i++)
-		{
-			bzero(buffer, 50);
-			printf("Receiving data from client:\n");
-			sleep(1);
-			recv(connfd, &buffer, 50, 0);
-			printf("from client: %s\n", buffer);
-			int num = atoi(buffer);
-			num = factorial(num);
-			printf("Calculating factorial now...\n");
-			sleep(1);
-			bzero(buffer, 50);
-			char string[20];
-			sprintf(string, "%d", num);
-			strcpy(buffer, string);
-			printf("Sending data to client\n");
-			send(connfd, &buffer, 50, 0);
-			fprintf(fp, "The factorial is: %d.\n", num);
-			
-		}
+		// fp = fopen("data.txt","w"); 
+		printf("Writing to file\n");
 		fprintf(fp, "The IP Addr is %s and Port Number is %d\n", inet_ntoa(cli.sin_addr), (int) ntohs(cli.sin_port));
+		pthread_t pt;
+		int *pclient = malloc(sizeof(int));
+		*pclient = connfd;
+		pthread_create(&pt, NULL, func, pclient);
+		// func(connfd);
 		fclose(fp);
+		// sleep(1);
+
+		
 	}
 
 	// After chatting close the socket
 	sleep(1);
 	printf("Server now closing.....\n");
-	
 	close(sockfd);
 }
