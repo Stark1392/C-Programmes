@@ -1,0 +1,118 @@
+#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include <unistd.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+
+typedef struct sockaddr_in SA_IN;
+typedef struct sockaddr SA;
+
+
+long long factorial(n){
+    if (n == 0){
+        return 1;
+    }
+    else{
+        return(n * factorial(n-1));  
+    }
+}
+
+void* connect_thread(int connect_addr){
+    //operations to be performed by the server
+    long long fact_result;
+    char buffer[256];
+    FILE *fptr;
+    fptr = fopen("./newf.txt","w");
+    int val = 1;
+
+    while(val <= 20){
+        // calulating the factorial
+        int buff_size = sizeof(buffer);
+        read(connect_addr, buffer, buff_size);
+        val = atoi(buffer);
+        fact_result = factorial(atoi(buffer));
+        if(val > 20){
+            //debugging, remove before submission
+            break;
+        }
+
+        // writing to the file
+        fprintf(fptr,"%li",fact_result);
+
+        // sending response from the server
+        char str[256];
+        sprintf(str, "%ld", fact_result);
+        write(connect_addr, str, sizeof(str));
+    }
+
+    fclose(fptr);
+}
+
+int returnSocket(){
+    return socket(AF_INET, SOCK_STREAM, 0);
+}
+
+int main(){
+    //driver code
+    int socket_addr, connect_addr, len_addr;
+    SA_IN server_addr,client_addr;
+    int res;
+
+    //creating a thread array
+    pthread_t threads[10];
+
+    //creating the socket for the server
+    socket_addr = returnSocket();
+    if (socket_addr < 0){
+        printf("Error in socket \n");
+    }else{
+        printf("Socket initiated \n");
+    }
+
+    memset(&server_addr,0 ,sizeof(server_addr));
+
+    //info about server
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(9090);
+
+    //binding the socket
+    int bind_c = bind(socket_addr, (SA*)&server_addr, sizeof(server_addr));
+    if (bind_c < 0){
+        printf("Error in socket \n");
+    }else{
+        printf("Socket binded \n");
+    }
+
+    //listen for client requests
+    int listen_c = listen(socket_addr,10);
+    if (listen_c < 0){
+        printf("Error in socket \n");
+    }else{
+        printf("Socket listening \n");
+    }
+
+    //confirming connection
+    len_addr = sizeof(SA_IN);
+    connect_addr = accept(socket_addr, (SA*)&client_addr, (socklen_t*)&len_addr);
+    if (connect_addr < 0){
+        printf("Error in socket \n");
+    }else{
+        printf("Connection successful \n");
+    }
+
+    // handling connect using onConnect function
+    for(int i=0; i<10; i++){
+        pthread_create(&threads[i], NULL, &connect_thread, connect_addr);
+        pthread_join(threads[i],NULL);
+    }
+
+    //close connection
+    close(socket_addr);
+}
